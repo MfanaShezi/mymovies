@@ -1,7 +1,11 @@
-import React, { useEffect,useState } from "react";
+import React, { useEffect,useState,useRef,useCallback } from "react";
 import Search from "./components/Search";
+import Spinner from "./components/Spinner";
+import Card from "./components/Card";
+import { useDebounce } from "react-use";
 
-//effects
+
+		//Apirequests  Setup
 		const API_BASE_URL ="https://api.themoviedb.org/3";
 		const API_KEY=import.meta.env.VITE_TMDB_API_KEY;
 		const API_OPTIONS={
@@ -15,12 +19,21 @@ import Search from "./components/Search";
 const App = () => {
 		//states
 		const [searchterm, setsearchterm] = useState('');
-		const [error, seterror] = useState(null);
+		const [errorMessage, seterrorMesssage] = useState(null);
+		const [movielist, setmovielist] = useState([]);
+		const [isloading , setisloading]=useState(false)
+		//const[debouncedterm,setdebounceterm]=useDebounce('')
 
+		//waits 500ms after user has typed to send a request
+		//useDebounce(() => setdebounceterm(searchterm),500,[searchterm])
+		//const [debouncedSearch] = useDebounce(searchterm, 500);
 		 
-		const fetchMovies = async () => {
+		const fetchMovies = async (query= '') => {
+			setisloading(true);
+			seterrorMesssage('');
+
 			try {
-				const endpoint=`${API_BASE_URL}/discover/movie?sort_by=popularity.desc`;
+				const endpoint= query ? `${API_BASE_URL}/search/movie?query=${encodeURIComponent(query)}` :`${API_BASE_URL}/discover/movie?sort_by=popularity.desc`  ;
 				const response = await fetch(endpoint, API_OPTIONS);
 
 				if(!response.ok) {
@@ -28,15 +41,29 @@ const App = () => {
 				}
 				const data = await response.json();
 				console.log(data);
-			} catch (error) {
-				console.error("Error fetching movies:", error);
-				seterror("Failed to fetch movies. Please try again later.");
+
+				if(data.response=='False'){
+					seterrorMesssage(data.Error || 'Failed to fetch movies ');
+					setmovielist([]);
+					return;
+				}
+
+				setmovielist(data.results || [])
+
+			} catch (errorMessage) {
+				console.errorMessage("Error fetching movies:", errorMessage);
+				seterrorMesssage("Failed to fetch movies. Please try again later.");
+			}
+			finally{
+				setisloading(false);
 			}
 		}
 
+		
+		//effects
 		useEffect(() => {
-			fetchMovies();
-		  },[])
+			fetchMovies(searchterm);
+		  },[searchterm])
 		
 
 
@@ -50,9 +77,21 @@ const App = () => {
 						</header>
 				         <Search searchterm={searchterm} setsearchterm={setsearchterm}  />
 						 <section className="all-movies">
-							<h2>All Movies</h2>
+							<h2 className="mt-[40px]">All Movies</h2>
 
-							{error && <p className="error-message">{error}</p>}
+							{
+								isloading ? (<Spinner/> )
+								: errorMessage ? (<p className="text-red-500">{errorMessage} </p> ) 
+								: (
+									<ul>
+										{movielist.map((movie)=>(
+											<Card key={movie.id} movie={movie} />
+										))}
+									</ul>
+									)
+							}
+
+
 						 </section>
 				</div>
 			</div>
